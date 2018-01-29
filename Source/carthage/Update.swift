@@ -58,6 +58,13 @@ public struct UpdateCommand: CommandProtocol {
 			self.buildOptions = buildOptions
 			self.checkoutOptions = checkoutOptions
 			self.dependenciesToUpdate = checkoutOptions.dependenciesToCheckout
+			Configuration.shared.isEnableNewResolver = useNewResolver
+			Configuration.shared.isEnableVerbose = isVerbose
+			Configuration.shared.platforms = buildOptions.platforms
+			Configuration.shared.configuration = buildOptions.configuration
+			Configuration.shared.isEnableCacheBuilds = buildOptions.cacheBuilds
+			Configuration.shared.isUsingSSH = checkoutOptions.useSSH
+			Configuration.shared.isUsingSubmodules = checkoutOptions.useSubmodules
 		}
 
 		public static func evaluate(_ mode: CommandMode) -> Result<Options, CommandantError<CarthageError>> {

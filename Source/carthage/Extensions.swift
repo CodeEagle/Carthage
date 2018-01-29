@@ -81,7 +81,7 @@ internal struct ProjectEventSink {
 			let formatting = colorOptions.formatting
 			let prefix = formatting.bulletin("***")
 			let opts = Configuration.shared.runOptions()
-			carthage.println(prefix + "Config options: " + formatting.path(opts) )
+			carthage.println(prefix + " Config options: " + formatting.path(opts) )
 		}
 	}
 

@@ -94,7 +94,7 @@ public final class Configuration {
 		let configurationString = "--configuration \(configuration)"
 		let platformsString =  " --platform \(platforms.flatMap({ Optional($0.rawValue) }).joined(separator: " "))"
 		let cacheBuildString =  isEnableCacheBuilds ? " --cache-builds" : ""
-		let newResolverString =  isEnableCacheBuilds ? " --new-resolver" : ""
+		let newResolverString =  isEnableNewResolver ? " --new-resolver" : ""
 		let verboseString = isEnableVerbose ? " --verbose" : ""
 		let sshString = isUsingSSH ? " --use-ssh" : ""
 		let submodulesString = isUsingSSH ? " --use-submodules" : ""
