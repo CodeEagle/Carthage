@@ -21,4 +21,6 @@ DerivedData
 .DS_Store
 
 Carthage.pkg
+CarthageApp.pkg
+CarthageKit.framework.zip
 Carthage/Build
