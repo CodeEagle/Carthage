@@ -9,7 +9,7 @@
 	url = https://github.com/jspahrsummers/xcconfigs.git
 [submodule "Carthage/Checkouts/Commandant"]
 	path = Carthage/Checkouts/Commandant
-	url = https://github.com/Carthage/Commandant.git
+	url = https://github.com/CodeEagle/Commandant.git
 [submodule "Carthage/Checkouts/ReactiveTask"]
 	path = Carthage/Checkouts/ReactiveTask
 	url = https://github.com/Carthage/ReactiveTask.git
