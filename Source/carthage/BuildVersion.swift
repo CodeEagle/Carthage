@@ -38,7 +38,7 @@ public func remoteVersion() -> SemanticVersion? {
 	let expirableVersionData = userDefaults.data(forKey: cachedKey)
 	let expirableVersion = ExpirableVersion(fromJSONData: expirableVersionData)
 	
-	guard let value = expirableVersion, value.isExpired == false else {
+	if let value = expirableVersion, value.isExpired == false {
 		return value.version
 	}
 	
