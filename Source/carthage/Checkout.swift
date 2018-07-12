@@ -32,9 +32,11 @@ public struct CheckoutCommand: CommandProtocol {
 		}
 
 		public static func evaluate(_ mode: CommandMode, dependenciesUsage: String) -> Result<Options, CommandantError<CarthageError>> {
+			let isUsingSubmodules = CCon.isUsingSubmodules
+			let isUsingSSH = CCon.isUsingSSH
 			return curry(self.init)
-				<*> mode <| Option(key: "use-ssh", defaultValue: false, usage: "use SSH for downloading GitHub repositories")
-				<*> mode <| Option(key: "use-submodules", defaultValue: false, usage: "add dependencies as Git submodules")
+				<*> mode <| Option(key: "use-ssh", defaultValue: isUsingSSH, usage: "use SSH for downloading GitHub repositories")
+				<*> mode <| Option(key: "use-submodules", defaultValue: isUsingSubmodules, usage: "add dependencies as Git submodules")
 				<*> ColorOptions.evaluate(mode)
 				<*> mode <| Option(key: "project-directory", defaultValue: FileManager.default.currentDirectoryPath, usage: "the directory containing the Carthage project")
 				<*> (mode <| Argument(defaultValue: [], usage: dependenciesUsage, usageParameter: "dependency names")).map { $0.isEmpty ? nil : $0 }

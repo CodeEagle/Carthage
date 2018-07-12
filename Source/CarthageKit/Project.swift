@@ -114,6 +114,9 @@ public final class Project { // swiftlint:disable:this type_body_length
 		_projectEventsObserver = observer
 
 		self.directoryURL = directoryURL
+		if CCon.isEnableGenerateFastBootXCConfig {
+			CCon.fastBootXCConfigFolder = directoryURL.appendingPathComponent("Carthage/FastBoot", isDirectory: false)
+		}
 	}
 
 	private typealias CachedVersions = [Dependency: [PinnedVersion]]
@@ -1105,6 +1108,8 @@ public final class Project { // swiftlint:disable:this type_body_length
 				let derivedDataPerDependency = derivedDataPerXcode.appendingPathComponent(dependency.name, isDirectory: true)
 				let derivedDataVersioned = derivedDataPerDependency.appendingPathComponent(version.commitish, isDirectory: true)
 				options.derivedDataPath = derivedDataVersioned.resolvingSymlinksInPath().path
+				
+				CCon.dependencyBuildPath[dependency] = options.derivedDataPath
 
 				return self.symlinkBuildPathIfNeeded(for: dependency, version: version)
 					.then(build(dependency: dependency, version: version, self.directoryURL, withOptions: options, sdkFilter: sdkFilter))
@@ -1473,7 +1478,8 @@ public func cloneOrFetch(
 		.flatMap(.merge) { (remoteURL: GitURL) -> SignalProducer<(ProjectEvent?, URL), CarthageError> in
 			return isGitRepository(repositoryURL)
 				.flatMap(.merge) { isRepository -> SignalProducer<(ProjectEvent?, URL), CarthageError> in
-					if isRepository {
+					let isLocalProject = dependency.isLocalProject
+					if isRepository, isLocalProject == false {
 						let fetchProducer: () -> SignalProducer<(ProjectEvent?, URL), CarthageError> = {
 							guard FetchCache.needsFetch(forURL: remoteURL) else {
 								return SignalProducer(value: (nil, repositoryURL))

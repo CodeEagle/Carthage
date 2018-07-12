@@ -752,7 +752,13 @@ public func build(
 ) -> BuildSchemeProducer {
 	let rawDependencyURL = rootDirectoryURL.appendingPathComponent(dependency.relativePath, isDirectory: true)
 	let dependencyURL = rawDependencyURL.resolvingSymlinksInPath()
-
+	
+	if CCon.skippableDependencies.contains(where: {
+		return $0.name.lowercased() == dependency.name.lowercased() && $0.scheme == nil
+	}) {
+		return BuildSchemeProducer(error: .skip(dependency, nil, nil) )
+	}
+	
 	return buildInDirectory(dependencyURL, withOptions: options, dependency: (dependency, version), rootDirectoryURL: rootDirectoryURL, sdkFilter: sdkFilter)
 		.mapError { error in
 			switch (dependency, error) {
@@ -794,6 +800,20 @@ public func buildInDirectory( // swiftlint:disable:this function_body_length
 					} else {
 						filteredSDKs = sdks.filter { options.platforms.contains($0.platform) }
 					}
+					
+					// Not build any scheme config in Configuration's skippableDependencies
+					if let dp = dependency?.dependency, CCon.skippableDependencies.contains(where: {
+						return $0.name.lowercased() == dp.name.lowercased() && $0.scheme?.lowercased() == scheme.name.lowercased() && $0.workspaceOrProject == project.fileURL.lastPathComponent
+					}) {
+						let name = CCon.formatHandler("\(scheme)", .quote)
+						let toLog = "⛑  Skip Building Scheme: \(name)"
+						if CCon.logRecords.contains(toLog) == false {
+							CCon.logHandler(toLog)
+							CCon.logRecords.insert(toLog)
+						}
+						return sdkFilter([], scheme, configuration, project)
+					}
+					
 					return sdkFilter(filteredSDKs, scheme, configuration, project)
 				}
 

@@ -16,12 +16,35 @@ extension BuildOptions: OptionsProtocol {
 		var platformUsage = "the platforms to build for (one of 'all', 'macOS', 'iOS', 'watchOS', 'tvOS', or comma-separated values of the formers except for 'all')"
 		platformUsage += addendum
 
+		// value from config
+		let configuration = CCon.configuration
+		let isEnableCacheBuilds = CCon.isEnableCacheBuilds
+		func buildPlatform(from platform: Platform) -> BuildPlatform {
+			switch platform {
+			case .iOS: return .iOS
+			case .macOS: return .macOS
+			case .tvOS: return .tvOS
+			case .watchOS: return .watchOS
+			}
+		}
+		var buildPlatformValue: BuildPlatform = .all
+		let platforms = CCon.platforms
+		let platformsCount = platforms.count
+		if platformsCount != Platform.supportedPlatforms.count {
+			if platformsCount == 1, let first = platforms.first {
+				buildPlatformValue = buildPlatform(from: first)
+			} else {
+				let values = platforms.compactMap({ Optional(buildPlatform(from: $0)) })
+				buildPlatformValue = .multiple(values)
+			}
+		}
+
 		return curry(self.init)
-			<*> mode <| Option(key: "configuration", defaultValue: "Release", usage: "the Xcode configuration to build" + addendum)
-			<*> (mode <| Option<BuildPlatform>(key: "platform", defaultValue: .all, usage: platformUsage)).map { $0.platforms }
+			<*> mode <| Option(key: "configuration", defaultValue: configuration, usage: "the Xcode configuration to build" + addendum)
+			<*> (mode <| Option<BuildPlatform>(key: "platform", defaultValue: buildPlatformValue, usage: platformUsage)).map { $0.platforms }
 			<*> mode <| Option<String?>(key: "toolchain", defaultValue: nil, usage: "the toolchain to build with")
 			<*> mode <| Option<String?>(key: "derived-data", defaultValue: nil, usage: "path to the custom derived data folder")
-			<*> mode <| Option(key: "cache-builds", defaultValue: false, usage: "use cached builds when possible")
+			<*> mode <| Option(key: "cache-builds", defaultValue: isEnableCacheBuilds, usage: "use cached builds when possible")
 			<*> mode <| Option(key: "use-binaries", defaultValue: true, usage: "don't use downloaded binaries when possible")
 	}
 }
@@ -111,6 +134,7 @@ public struct BuildCommand: CommandProtocol {
 								stderrHandle.write(data)
 
 							case let .success(project, scheme):
+								CCon.startBuildProject(project.fileURL)
 								carthage.println(formatting.bullets + "Building scheme " + formatting.quote(scheme.name) + " in " + formatting.projectName(project.description))
 							}
 						}
@@ -149,6 +173,10 @@ public struct BuildCommand: CommandProtocol {
 			let currentProducers = buildInDirectory(directoryURL, withOptions: options.buildOptions, rootDirectoryURL: directoryURL)
 				.flatMapError { error -> BuildSchemeProducer in
 					switch error {
+					case let .skip(dependency, _, _):
+						eventSink.put(.skippedBuilding(dependency, error.description))
+						return .empty
+
 					case let .noSharedFrameworkSchemes(project, _):
 						// Log that building the current project is being skipped.
 						eventSink.put(.skippedBuilding(project, error.description))
