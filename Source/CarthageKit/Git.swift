@@ -180,6 +180,16 @@ public func checkoutRepositoryToDirectory(
 /// repository, but without any Git metadata.
 public func cloneSubmoduleInWorkingDirectory(_ submodule: Submodule, _ workingDirectoryURL: URL) -> SignalProducer<(), CarthageError> {
 	let submoduleDirectoryURL = workingDirectoryURL.appendingPathComponent(submodule.path, isDirectory: true)
+	
+	var submodule = submodule
+	// override submodule url
+	if let dep = CCon.overridableDependencies[submodule.name.lowercased()], let url = dep.gitURL(preferHTTPS: true) {
+		let formatter = CCon.formatHandler
+		let ovrURL = formatter("\(url)", .path)
+		let name = formatter(submodule.name, .projectName)
+		CCon.logHandler("Override \(name) to \(ovrURL)")
+		submodule.url = url
+	}
 
 	func repositoryCheck<T>(_ description: String, attempt closure: () throws -> T) -> Result<T, CarthageError> {
 		do {

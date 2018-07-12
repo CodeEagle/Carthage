@@ -68,11 +68,13 @@ public struct Cartfile {
 					return
 				}
 
-				if dependencies[dependency] == nil {
-					dependencies[dependency] = version
+				let dp = CCon.uniqueDependency(for: dependency)
+				if dependencies[dp] == nil {
+					dependencies[dp] = version
 				} else {
-					duplicates.append(dependency)
+					duplicates.append(dp)
 				}
+				CCon.replaceOverrideDependencies(for: &dependencies)
 
 			case let .failure(error):
 				result = .failure(CarthageError(scannableError: error))
@@ -118,6 +120,7 @@ public struct Cartfile {
 		for (dependency, version) in cartfile.dependencies {
 			dependencies[dependency] = version
 		}
+		CCon.replaceOverrideDependencies(for: &dependencies)
 	}
 }
 

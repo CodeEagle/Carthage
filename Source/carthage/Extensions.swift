@@ -72,8 +72,19 @@ extension GitURL: ArgumentProtocol {
 internal struct ProjectEventSink {
 	private let colorOptions: ColorOptions
 
+	private static var showOnce = false
+	
 	init(colorOptions: ColorOptions) {
 		self.colorOptions = colorOptions
+		
+		golbalColorOption = colorOptions
+		if ProjectEventSink.showOnce == false {
+			ProjectEventSink.showOnce = true
+			let formatting = colorOptions.formatting
+			let prefix = formatting.bulletin("***")
+			let opts = CCon.runOptions()
+			carthage.println(prefix + " Config options: " + formatting.path(opts) )
+		}
 	}
 
 	mutating func put(_ event: ProjectEvent) { // swiftlint:disable:this cyclomatic_complexity
@@ -81,7 +92,10 @@ internal struct ProjectEventSink {
 
 		switch event {
 		case let .cloning(dependency):
-			carthage.println(formatting.bullets + "Cloning " + formatting.projectName(dependency.name))
+			let name = dependency.name
+			guard CCon.logRecords.contains(name) == false else { return }
+			CCon.logRecords.insert(name)
+			carthage.println(formatting.bullets + "Cloning " + formatting.projectName(name))
 
 		case let .fetching(dependency):
 			carthage.println(formatting.bullets + "Fetching " + formatting.projectName(dependency.name))

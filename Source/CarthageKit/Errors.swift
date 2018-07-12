@@ -87,6 +87,9 @@ public enum CarthageError: Error {
 
 	/// An internal error occurred
 	case internalError(description: String)
+	
+	/// Skip Certain scheme
+	case skip(Dependency, Scheme?, ProjectLocator?)
 }
 
 extension CarthageError {
@@ -334,6 +337,9 @@ extension CarthageError: CustomStringConvertible {
 
 		case let .internalError(description):
 			return description
+		
+		case let .skip(dependency, scheme, project):
+			return "🚩  Skip: \(dependency), scheme: \(scheme?.description ?? "nil"), project: \(project?.description ?? "nil")"
 		}
 	}
 }
