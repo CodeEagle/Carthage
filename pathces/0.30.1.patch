@@ -1,0 +1,813 @@
+From 63a46e46339bbcbabbae96071bdbc00058705b36 Mon Sep 17 00:00:00 2001
+From: "Lincoln.Law" <stasura@hotmail.com>
+Date: Thu, 12 Jul 2018 14:53:10 +0800
+Subject: [PATCH] add patch
+
+---
+ Carthage.xcodeproj/project.pbxproj     |   4 +
+ Source/CarthageKit/Cartfile.swift      |   9 +-
+ Source/CarthageKit/Configuration.swift | 407 +++++++++++++++++++++++++
+ Source/CarthageKit/Errors.swift        |   6 +
+ Source/CarthageKit/Git.swift           |  10 +
+ Source/CarthageKit/Project.swift       |   8 +-
+ Source/CarthageKit/Xcode.swift         |  22 +-
+ Source/carthage/Build.swift            |  34 ++-
+ Source/carthage/Checkout.swift         |   6 +-
+ Source/carthage/Extensions.swift       |  16 +-
+ Source/carthage/Update.swift           |  15 +-
+ Source/carthage/main.swift             |  28 +-
+ 12 files changed, 550 insertions(+), 15 deletions(-)
+ create mode 100644 Source/CarthageKit/Configuration.swift
+
+diff --git a/Carthage.xcodeproj/project.pbxproj b/Carthage.xcodeproj/project.pbxproj
+index d201ac51..37aed980 100644
+--- a/Carthage.xcodeproj/project.pbxproj
++++ b/Carthage.xcodeproj/project.pbxproj
+@@ -9,6 +9,7 @@
+ /* Begin PBXBuildFile section */
+ 		0FDFEA7E2055D638008862E3 /* ProxyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FDFEA7D2055D638008862E3 /* ProxyTests.swift */; };
+ 		0FDFEA802055FACE008862E3 /* Proxy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FDFEA7F2055FACE008862E3 /* Proxy.swift */; };
++		10B24AFB20F7031000C4AF8D /* Configuration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10B24AF920F702E100C4AF8D /* Configuration.swift */; };
+ 		2190FA981FD5B2F0008D8A79 /* OutdatedDependencies in Resources */ = {isa = PBXBuildFile; fileRef = 2190FA961FD5B05F008D8A79 /* OutdatedDependencies */; };
+ 		21F11B481FE67A26009FB783 /* DB.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21F11B461FE6787F009FB783 /* DB.swift */; };
+ 		3A0472F31C782B4000097EC7 /* Algorithms.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0472F21C782B4000097EC7 /* Algorithms.swift */; };
+@@ -179,6 +180,7 @@
+ /* Begin PBXFileReference section */
+ 		0FDFEA7D2055D638008862E3 /* ProxyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProxyTests.swift; sourceTree = "<group>"; };
+ 		0FDFEA7F2055FACE008862E3 /* Proxy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Proxy.swift; sourceTree = "<group>"; };
++		10B24AF920F702E100C4AF8D /* Configuration.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Configuration.swift; sourceTree = "<group>"; };
+ 		2190FA961FD5B05F008D8A79 /* OutdatedDependencies */ = {isa = PBXFileReference; lastKnownFileType = folder; path = OutdatedDependencies; sourceTree = "<group>"; };
+ 		21F11B461FE6787F009FB783 /* DB.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DB.swift; sourceTree = "<group>"; };
+ 		3A0472F21C782B4000097EC7 /* Algorithms.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Algorithms.swift; sourceTree = "<group>"; };
+@@ -507,6 +509,7 @@
+ 			isa = PBXGroup;
+ 			children = (
+ 				D0D1217119E87B05005E4BAA /* CarthageKit.h */,
++				10B24AF920F702E100C4AF8D /* Configuration.swift */,
+ 				3A0472F21C782B4000097EC7 /* Algorithms.swift */,
+ 				D069CA231A4E3B2700314A85 /* Archive.swift */,
+ 				CD3E530A1DE33095002C135C /* Availability.swift */,
+@@ -858,6 +861,7 @@
+ 				CD28C99D1E11846200322AF7 /* ProductType.swift in Sources */,
+ 				CD43D9DA1F41640E00CD60F6 /* CarthageKitVersion.swift in Sources */,
+ 				8A239F3C2097586F005F02F2 /* BundleExtensions.swift in Sources */,
++				10B24AFB20F7031000C4AF8D /* Configuration.swift in Sources */,
+ 				CDF9D3711CF1E54200DF5A6F /* BuildOptions.swift in Sources */,
+ 				CDF94D951E71144300200486 /* DuplicateDependency.swift in Sources */,
+ 				CD43D9DE1F43074000CD60F6 /* GitURL.swift in Sources */,
+diff --git a/Source/CarthageKit/Cartfile.swift b/Source/CarthageKit/Cartfile.swift
+index 7aa70b29..1b935d16 100644
+--- a/Source/CarthageKit/Cartfile.swift
++++ b/Source/CarthageKit/Cartfile.swift
+@@ -68,11 +68,13 @@ public struct Cartfile {
+ 					return
+ 				}
+ 
+-				if dependencies[dependency] == nil {
+-					dependencies[dependency] = version
++				let dp = CCon.uniqueDependency(for: dependency)
++				if dependencies[dp] == nil {
++					dependencies[dp] = version
+ 				} else {
+-					duplicates.append(dependency)
++					duplicates.append(dp)
+ 				}
++				CCon.replaceOverrideDependencies(for: &dependencies)
+ 
+ 			case let .failure(error):
+ 				result = .failure(CarthageError(scannableError: error))
+@@ -118,6 +120,7 @@ public struct Cartfile {
+ 		for (dependency, version) in cartfile.dependencies {
+ 			dependencies[dependency] = version
+ 		}
++		CCon.replaceOverrideDependencies(for: &dependencies)
+ 	}
+ }
+ 
+diff --git a/Source/CarthageKit/Configuration.swift b/Source/CarthageKit/Configuration.swift
+new file mode 100644
+index 00000000..23b6eee3
+--- /dev/null
++++ b/Source/CarthageKit/Configuration.swift
+@@ -0,0 +1,407 @@
++//
++//  Configuration.swift
++//  carthage
++//
++//  Created by Lincoln Law on 2018/1/4.
++//  Copyright © 2018年 Carthage. All rights reserved.
++//
++
++import Foundation
++import XCDBLD
++import PrettyColors
++/// Carthage Configuration
++public let CCon = Configuration.shared
++public final class Configuration {
++	
++	public static let shared = Configuration()
++	/// The Xcode configuration to build.
++	public var configuration: String = "Release"
++	/// The platforms to build for.
++	public var platforms: Set<Platform> = Set(Platform.supportedPlatforms)
++	/// Rebuild even if cached builds exist.
++	public var isEnableCacheBuilds: Bool = false
++	public var isEnableGenerateFastBootXCConfig: Bool = false
++	public var isEnableNewResolver: Bool = false
++	public var isEnableVerbose: Bool = false
++	public var isUsingSSH: Bool = false
++	public var isUsingSubmodules: Bool = false
++	public var skippableDependencies: [SkippableDepency] = []
++	public var overridableDependencies: [String : Dependency] = [:]
++	public var totalDependencies: [String : Dependency] = [:]
++	public var dependencyBuildPath: [Dependency : String] = [:]
++	public var fastBootXCConfigFolder: URL?
++	public var excludePaths: Set<String> = []
++	public var formatHandler: (String, LogStyle) -> String = { raw, _ in return raw }
++	public var logHandler: (String) -> Void = { _ in }
++	private var currentDependency: Dependency? = nil
++	private var buildedPathDependency: Set<Dependency> = []
++	public var logRecords: Set<String> = []
++	
++	private init() { }
++	
++	public func readConfig() {
++		guard let pwd = ProcessInfo.processInfo.environment["PWD"] else { return }
++		let privateCartfilePath = "\(pwd)/\(Constants.Project.privateCartfilePath)"
++		guard let content = try? String.init(contentsOfFile: privateCartfilePath) else { return }
++		
++		content.enumerateLines { (line, ioStop) in
++			let trimLine = line.trim
++			if trimLine.hasPrefix(Key.override) {
++				self.readOverridableDependency(from: trimLine)
++			} else if trimLine.hasPrefix(Key.excludePath) {
++				self.excludePaths.insert(trimLine.replacingOccurrences(of: Key.excludePath.rawValue, with: "").trim)
++			} else if trimLine.hasPrefix(Key.skip) {
++				self.readSkippableDependency(from: trimLine)
++			} else if trimLine.hasPrefix(Key.platforms) {
++				self.readPlatform(from: trimLine)
++			} else if trimLine.hasPrefix(Key.configuration) {
++				self.readConfiguration(from: trimLine)
++			} else if trimLine.hasPrefix(Key.cacheBuilds) {
++				self.isEnableCacheBuilds = Key.cacheBuilds.bool(from: trimLine)
++			} else if trimLine.hasPrefix(Key.newResolver) {
++				self.isEnableNewResolver = Key.newResolver.bool(from: trimLine)
++			} else if trimLine.hasPrefix(Key.verbose) {
++				self.isEnableVerbose = Key.verbose.bool(from: trimLine)
++			} else if trimLine.hasPrefix(Key.useSubmodules) {
++				self.isUsingSubmodules = Key.useSubmodules.bool(from: trimLine)
++			} else if trimLine.hasPrefix(Key.generateFastBootXCConfig) {
++				self.isEnableGenerateFastBootXCConfig = Key.generateFastBootXCConfig.bool(from: trimLine)
++			}
++		}
++	}
++	
++	private func readPlatform(from line: String) {
++		let trimLine = line.replacingOccurrences(of: Key.platforms.rawValue, with: "").trimCommentInLine.trim
++		if trimLine.isEmpty { return }
++		let preferPlatforms = trimLine.components(separatedBy: ",").compactMap({ Platform.from($0) })
++		platforms = Set(preferPlatforms)
++	}
++	
++	private func readConfiguration(from line: String) {
++		var trimLine = line.replacingOccurrences(of: Key.configuration.rawValue, with: "").trimCommentInLine.trim
++		if ["release", "debug"].contains(trimLine.lowercased()) {
++			trimLine = trimLine.capitalized
++		}
++		configuration = trimLine
++	}
++	
++	private func readSkippableDependency(from line: String) {
++		let trimLine = line.replacingOccurrences(of: Key.skip.rawValue, with: "").trimCommentInLine.trim
++		let components = trimLine.components(separatedBy: ",")
++		guard let name = components[c_safe: 0]?.trim else { return }
++		let workspaceOrProject = components[c_safe: 1]?.trim
++		let scheme = components[c_safe: 2]?.trim
++		let dependency = SkippableDepency(name: name, scheme: scheme, workspaceOrProject: workspaceOrProject)
++		skippableDependencies.append(dependency)
++	}
++	
++	private func readOverridableDependency(from line: String) {
++		let components = line.replacingOccurrences(of: Key.override.rawValue, with: "").trimCommentInLine.trim.components(separatedBy: ",")
++		guard let name = components[c_safe: 0]?.trim.lowercased(), let path = components[c_safe: 1]?.trim else { return }
++		let denpendency = Dependency.git(GitURL(path))
++		overridableDependencies[name] = denpendency
++	}
++	
++	public func runOptions() -> String {
++
++		let configurationString = "--configuration \(configuration)"
++		let platformsString =  " --platform \(platforms.compactMap({ Optional($0.rawValue) }).joined(separator: " "))"
++		let cacheBuildString =  isEnableCacheBuilds ? " --cache-builds" : ""
++		let newResolverString =  isEnableNewResolver ? " --new-resolver" : ""
++		let verboseString = isEnableVerbose ? " --verbose" : ""
++		let sshString = isUsingSSH ? " --use-ssh" : ""
++		let submodulesString = isUsingSSH ? " --use-submodules" : ""
++		let generateXCConfig = isEnableGenerateFastBootXCConfig ? " generate-fast-boot-xcconfig" : ""
++
++		return "\(configurationString)\(cacheBuildString)\(platformsString)\(newResolverString)\(verboseString)\(sshString)\(submodulesString)\(generateXCConfig)"
++	}
++	
++	private func dependencyFrom(url: URL) -> Dependency? {
++		let raw = url.absoluteString
++		for (dependency, _) in dependencyBuildPath {
++			let target = "/Checkouts/\(dependency.name)/"
++			guard raw.contains(target) else { continue }
++			return dependency
++		}
++		return nil
++	}
++	
++	public func startBuildProject(_ url: URL) {
++		guard let dependency = dependencyFrom(url: url) else { return }
++		if let old = currentDependency {
++			if old != dependency {
++				generateFileLogForCurrentDependency(old)
++			}
++			currentDependency = dependency
++		} else {
++			currentDependency = dependency
++		}
++	}
++	
++	public func generateFileLogForCurrentDependency(_ dependency: Dependency) {
++		if buildedPathDependency.contains(dependency) { return }
++		guard let buildPath = dependencyBuildPath[dependency] else { return }
++		guard isEnableGenerateFastBootXCConfig, let baseURL = fastBootXCConfigFolder, platforms.contains(.iOS) else { return }
++		buildedPathDependency.insert(dependency)
++		let outputFolder = baseURL.absoluteString
++		if FileManager.default.fileExists(atPath: outputFolder) == false {
++			try? FileManager.default.createDirectory(at: baseURL, withIntermediateDirectories: true)
++		}
++		let rawSuffix = "rawFilelist"
++		let lines = findOFiles(in: buildPath).joined(separator: "\n").trimmingCharacters(in: .newlines).data(using: .utf8)
++		let url = baseURL.appendingPathComponent("\(dependency.name).\(rawSuffix)", isDirectory: false)
++		try? lines?.write(to: url)
++	}
++	
++	public func generateCompileFilesPath() {
++		guard isEnableGenerateFastBootXCConfig, let baseURL = fastBootXCConfigFolder, platforms.contains(.iOS) else { return }
++		let outputFolder = baseURL.absoluteString
++		if FileManager.default.fileExists(atPath: outputFolder) == false {
++			try? FileManager.default.createDirectory(at: baseURL, withIntermediateDirectories: true)
++		}
++		let rawSuffix = "rawFilelist"
++		for (dependency, _) in dependencyBuildPath {
++			generateFileLogForCurrentDependency(dependency)
++		}
++		let folderPath = outputFolder.replacingOccurrences(of: "file://", with: "")
++		guard let items = try? FileManager.default.contentsOfDirectory(atPath: folderPath) else { return }
++		let archs: [Arch] = [.armv7, .arm64, .i386, .x86_64]
++		var archLines: [Arch : [String]] = [:]
++		for item in items {
++			guard item.hasSuffix(".\(rawSuffix)") else { continue }
++			let url = baseURL.appendingPathComponent(item, isDirectory: false)
++			guard let content = try? String(contentsOf: url) else { continue }
++			var duplicateName: [Arch : Set<String>] = [:]
++			content.enumerateLines(invoking: { (line, _) in
++				for arch in archs {
++					guard line.contains("/\(arch.rawValue)/") else { continue }
++					guard self.excludeThis(line) == false else { continue }
++					let lastPart = (line as NSString).lastPathComponent
++					var archSet = duplicateName[arch] ?? []
++					if archSet.contains(lastPart) { continue }
++					archSet.insert(lastPart)
++					duplicateName[arch] = archSet
++					var lines = archLines[arch] ?? []
++					lines.append(line)
++					archLines[arch] = lines
++					break
++				}
++			})
++		}
++		for (arch, lines) in archLines {
++			let content = lines.joined(separator: "\n").trimmingCharacters(in: .newlines).data(using: .utf8)
++			let url = baseURL.appendingPathComponent("\(arch.rawValue).filelist", isDirectory: false)
++			try? content?.write(to: url)
++		}
++		
++		let baseXcconfigPath = baseURL.appendingPathComponent("Base.xcconfig", isDirectory: false)
++		let debugXcconfigPath = baseURL.appendingPathComponent("Debug.xcconfig", isDirectory: false)
++		let ReleaseXcconfigPath = baseURL.appendingPathComponent("Release.xcconfig", isDirectory: false)
++		
++		let baseXcconfig =
++"""
++FRAMEWORK_SEARCH_PATHS = $(inherited) $(PROJECT_DIR)/Carthage/Build/iOS
++LD_RUNPATH_SEARCH_PATHS = $(inherited) @loader_path/Frameworks
++OTHER_LDFLAGS = $(inherited) -fprofile-instr-generate
++"""
++		let debugXcconfig =
++"""
++#include "Release.xcconfig"
++OTHER_LDFLAGS[arch=arm64] = $(inherited) -filelist $(SRCROOT)/Carthage/FastBoot/arm64.filelist
++OTHER_LDFLAGS[arch=armv7] = $(inherited) -filelist $(SRCROOT)/Carthage/FastBoot/armv7.filelist
++"""
++		let releaseXcconfig =
++"""
++#include "Base.xcconfig"
++OTHER_LDFLAGS[arch=arm64] = $(inherited) -filelist $(SRCROOT)/Carthage/FastBoot/arm64.filelist
++OTHER_LDFLAGS[arch=armv7] = $(inherited) -filelist $(SRCROOT)/Carthage/FastBoot/armv7.filelist
++"""
++		try? baseXcconfig.data(using: .utf8)?.write(to: baseXcconfigPath)
++		try? debugXcconfig.data(using: .utf8)?.write(to: debugXcconfigPath)
++		try? releaseXcconfig.data(using: .utf8)?.write(to: ReleaseXcconfigPath)
++	}
++	
++	private func excludeThis(_ line: String) -> Bool {
++		for item in excludePaths {
++			if line.contains(item) { return true }
++		}
++		return false
++	}
++	
++	private func findOFiles(in path: String) -> [String] {
++		var total: [String] = []
++		if let items = try? FileManager.default.contentsOfDirectory(atPath: path) {
++			var isDir = ObjCBool(false)
++			for item in items {
++				isDir = ObjCBool(false)
++				guard item != ".DS_Store" else { continue }
++				let itemPath = "\(path)/\(item)"
++				if FileManager.default.fileExists(atPath: itemPath, isDirectory: &isDir) {
++					if isDir.boolValue == true {
++						total += findOFiles(in: itemPath)
++					} else {
++						guard item.hasSuffix(".o") else { continue }
++						total.append(itemPath)
++					}
++				}
++			}
++		}
++		return total
++	}
++}
++extension Configuration {
++	func uniqueDependency(for dependency: Dependency) -> Dependency {
++		var value = dependency
++		let name = dependency.name
++		if let old = totalDependencies[name] {
++			if old.isLocalProject == false, dependency.isLocalProject == true {
++				totalDependencies[name] = dependency
++			} else {
++				value = old
++			}
++		} else {
++			totalDependencies[name] = dependency
++		}
++		return value
++	}
++	
++	func replaceOverrideDependencies(for dependencies: UnsafeMutablePointer<[Dependency: VersionSpecifier]>){
++		let value = dependencies.pointee
++		var copyDependencies = value
++		let formatter = CCon.formatHandler
++		let log = CCon.logHandler
++		for (dependency, version) in value {
++			let name = dependency.name.lowercased()
++			if let overrideRepo = overridableDependencies[name], overrideRepo != dependency {
++				copyDependencies[dependency] = nil
++				copyDependencies[overrideRepo] = version
++				let name = formatter(name, .projectName)
++				let url = formatter(overrideRepo.gitURL(preferHTTPS: true)?.description ?? "", .path)
++				let message = "Override \(name) to \(url)"
++				if CCon.logRecords.contains(message) == false {
++					CCon.logRecords.insert(message)
++					log(message)
++				}
++			}
++		}
++		dependencies.pointee = copyDependencies
++	}
++}
++extension Configuration: CustomStringConvertible {
++	public var description: String {
++		return
++"""
++  Configuration {
++	isEnableCacheBuilds: \(isEnableCacheBuilds),
++	isEnableGenerateFastBootXCConfig: \(isEnableGenerateFastBootXCConfig),
++	configuration: \(configuration),
++	isEnableNewResolver: \(isEnableNewResolver),
++	isEnableVerbose: \(isEnableVerbose),
++	isUsingSSH: \(isUsingSSH)
++	isUsingSubmodules: \(isUsingSubmodules)
++	platforms:\(platforms),
++	skippableDepencies:\(skippableDependencies),
++	overridableDepencies:\(overridableDependencies)
++  }
++"""
++	}
++}
++/*
++#cache-builds: true/false, default false
++#verbose: true/false, default false
++#configuration: Release/Debug or other
++#new-resolver: true/false, default false
++#use-ssh: true/false, default false
++#use-submodules: true/false, default false
++#platform: all/macOS/iOS/watchOS/tvOS
++#skip Alamofire,Alamofire.xcworkspace,Alamofire iOS
++#override Alamofire,../Alamofire
++#generate-fast-boot-xcconfig: true/false, default false
++#exclude-path: string, exclude xcconfig arch o file path contain this string
++*/
++extension Configuration {
++	public enum Key: String {
++		case verbose = "#verbose:"
++		case configuration = "#configuration:"
++		case newResolver = "#new-resolver:"
++		case useSSH = "#use-ssh:"
++		case useSubmodules = "#use-submodules:"
++		case cacheBuilds = "#cache-builds:"
++		case platforms = "#platforms:"
++		case skip = "#skip:"
++		case override = "#override:"
++		case generateFastBootXCConfig = "#generate-fast-boot-xcconfig:"
++		case excludePath = "#exclude-path:"
++		
++		func bool(from line: String) -> Bool {
++			let trimLine = line.replacingOccurrences(of: rawValue, with: "").trimCommentInLine.trim.lowercased()
++			return trimLine == "true"
++		}
++	}
++	
++	public struct SkippableDepency {
++		public let name: String
++		public let scheme: String?
++		public let workspaceOrProject: String?
++	}
++	
++	public enum Arch: String {
++		case armv7, arm64, i386, x86_64
++	}
++	
++	public enum LogStyle {
++		case quote, path, projectName
++	}
++}
++
++
++extension Platform {
++	static func from(_ raw: String) -> Platform? {
++		let lowercasedRaw = raw.lowercased()
++		let mac = ["osx", "mac", "macos"]
++		switch lowercasedRaw {
++		case "ios": return .iOS
++		case "watchos": return .watchOS
++		case "tvos": return .tvOS
++		default:
++			if mac.contains(lowercasedRaw) { return .macOS }
++			return nil
++		}
++	}
++}
++extension Array {
++	subscript(c_safe index: Int) -> Element? {
++		return indices ~= index ? self[index] : nil
++	}
++}
++extension String {
++	var trimCommentInLine: String {
++		var target = self
++		let components = target.split(separator: "#")
++		if let value = components.first {
++			target = String(value)
++		}
++		return target
++	}
++	var trim: String { return trimmingCharacters(in: CharacterSet.whitespacesAndNewlines) }
++	func hasPrefix<T: RawRepresentable>(_ key: T) -> Bool where T.RawValue == String {
++		return hasPrefix(key.rawValue)
++	}
++}
++
++extension Dependency {
++	public var isLocalProject: Bool {
++		switch self {
++		case .git(let url):
++			let urlString = url.urlString
++			if urlString.hasPrefix("file://")
++				|| urlString.hasPrefix("/") // "/path/to/..."
++				|| urlString.hasPrefix(".") // "./path/to/...", "../path/to/..."
++				|| urlString.hasPrefix("~") // "~/path/to/..."
++				|| !urlString.contains(":") // "path/to/..." with avoiding "git@github.com:owner/name"
++			{ return true }
++			return false
++		default: return false
++		}
++	}
++}
+diff --git a/Source/CarthageKit/Errors.swift b/Source/CarthageKit/Errors.swift
+index 7c9e399f..d65925fa 100644
+--- a/Source/CarthageKit/Errors.swift
++++ b/Source/CarthageKit/Errors.swift
+@@ -87,6 +87,9 @@ public enum CarthageError: Error {
+ 
+ 	/// An internal error occurred
+ 	case internalError(description: String)
++	
++	/// Skip Certain scheme
++	case skip(Dependency, Scheme?, ProjectLocator?)
+ }
+ 
+ extension CarthageError {
+@@ -334,6 +337,9 @@ extension CarthageError: CustomStringConvertible {
+ 
+ 		case let .internalError(description):
+ 			return description
++		
++		case let .skip(dependency, scheme, project):
++			return "🚩  Skip: \(dependency), scheme: \(scheme?.description ?? "nil"), project: \(project?.description ?? "nil")"
+ 		}
+ 	}
+ }
+diff --git a/Source/CarthageKit/Git.swift b/Source/CarthageKit/Git.swift
+index 678713a0..0a4d30d3 100644
+--- a/Source/CarthageKit/Git.swift
++++ b/Source/CarthageKit/Git.swift
+@@ -180,6 +180,16 @@ public func checkoutRepositoryToDirectory(
+ /// repository, but without any Git metadata.
+ public func cloneSubmoduleInWorkingDirectory(_ submodule: Submodule, _ workingDirectoryURL: URL) -> SignalProducer<(), CarthageError> {
+ 	let submoduleDirectoryURL = workingDirectoryURL.appendingPathComponent(submodule.path, isDirectory: true)
++	
++	var submodule = submodule
++	// override submodule url
++	if let dep = CCon.overridableDependencies[submodule.name.lowercased()], let url = dep.gitURL(preferHTTPS: true) {
++		let formatter = CCon.formatHandler
++		let ovrURL = formatter("\(url)", .path)
++		let name = formatter(submodule.name, .projectName)
++		CCon.logHandler("Override \(name) to \(ovrURL)")
++		submodule.url = url
++	}
+ 
+ 	func repositoryCheck<T>(_ description: String, attempt closure: () throws -> T) -> Result<T, CarthageError> {
+ 		do {
+diff --git a/Source/CarthageKit/Project.swift b/Source/CarthageKit/Project.swift
+index 7309fdc7..e329098e 100644
+--- a/Source/CarthageKit/Project.swift
++++ b/Source/CarthageKit/Project.swift
+@@ -114,6 +114,9 @@ public final class Project { // swiftlint:disable:this type_body_length
+ 		_projectEventsObserver = observer
+ 
+ 		self.directoryURL = directoryURL
++		if CCon.isEnableGenerateFastBootXCConfig {
++			CCon.fastBootXCConfigFolder = directoryURL.appendingPathComponent("Carthage/FastBoot", isDirectory: false)
++		}
+ 	}
+ 
+ 	private typealias CachedVersions = [Dependency: [PinnedVersion]]
+@@ -1069,6 +1072,8 @@ public final class Project { // swiftlint:disable:this type_body_length
+ 				let derivedDataPerDependency = derivedDataPerXcode.appendingPathComponent(dependency.name, isDirectory: true)
+ 				let derivedDataVersioned = derivedDataPerDependency.appendingPathComponent(version.commitish, isDirectory: true)
+ 				options.derivedDataPath = derivedDataVersioned.resolvingSymlinksInPath().path
++				
++				CCon.dependencyBuildPath[dependency] = options.derivedDataPath
+ 
+ 				return self
+ 					.dependencySet(for: dependency, version: version)
+@@ -1411,7 +1416,8 @@ public func cloneOrFetch(
+ 		.flatMap(.merge) { (remoteURL: GitURL) -> SignalProducer<(ProjectEvent?, URL), CarthageError> in
+ 			return isGitRepository(repositoryURL)
+ 				.flatMap(.merge) { isRepository -> SignalProducer<(ProjectEvent?, URL), CarthageError> in
+-					if isRepository {
++					let isLocalProject = dependency.isLocalProject
++					if isRepository, isLocalProject == false {
+ 						let fetchProducer: () -> SignalProducer<(ProjectEvent?, URL), CarthageError> = {
+ 							guard FetchCache.needsFetch(forURL: remoteURL) else {
+ 								return SignalProducer(value: (nil, repositoryURL))
+diff --git a/Source/CarthageKit/Xcode.swift b/Source/CarthageKit/Xcode.swift
+index 24ca0023..a152e341 100644
+--- a/Source/CarthageKit/Xcode.swift
++++ b/Source/CarthageKit/Xcode.swift
+@@ -767,7 +767,13 @@ public func build(
+ ) -> BuildSchemeProducer {
+ 	let rawDependencyURL = rootDirectoryURL.appendingPathComponent(dependency.relativePath, isDirectory: true)
+ 	let dependencyURL = rawDependencyURL.resolvingSymlinksInPath()
+-
++	
++	if CCon.skippableDependencies.contains(where: {
++		return $0.name.lowercased() == dependency.name.lowercased() && $0.scheme == nil
++	}) {
++		return BuildSchemeProducer(error: .skip(dependency, nil, nil) )
++	}
++	
+ 	return buildInDirectory(dependencyURL, withOptions: options, dependency: (dependency, version), rootDirectoryURL: rootDirectoryURL, sdkFilter: sdkFilter)
+ 		.mapError { error in
+ 			switch (dependency, error) {
+@@ -809,6 +815,20 @@ public func buildInDirectory( // swiftlint:disable:this function_body_length
+ 					} else {
+ 						filteredSDKs = sdks.filter { options.platforms.contains($0.platform) }
+ 					}
++					
++					// Not build any scheme config in Configuration's skippableDependencies
++					if let dp = dependency?.dependency, CCon.skippableDependencies.contains(where: {
++						return $0.name.lowercased() == dp.name.lowercased() && $0.scheme?.lowercased() == scheme.name.lowercased() && $0.workspaceOrProject == project.fileURL.lastPathComponent
++					}) {
++						let name = CCon.formatHandler("\(scheme)", .quote)
++						let toLog = "⛑  Skip Building Scheme: \(name)"
++						if CCon.logRecords.contains(toLog) == false {
++							CCon.logHandler(toLog)
++							CCon.logRecords.insert(toLog)
++						}
++						return sdkFilter([], scheme, configuration, project)
++					}
++					
+ 					return sdkFilter(filteredSDKs, scheme, configuration, project)
+ 				}
+ 
+diff --git a/Source/carthage/Build.swift b/Source/carthage/Build.swift
+index 467c3200..f0c7253f 100644
+--- a/Source/carthage/Build.swift
++++ b/Source/carthage/Build.swift
+@@ -15,13 +15,36 @@ extension BuildOptions: OptionsProtocol {
+ 	public static func evaluate(_ mode: CommandMode, addendum: String) -> Result<BuildOptions, CommandantError<CarthageError>> {
+ 		var platformUsage = "the platforms to build for (one of 'all', 'macOS', 'iOS', 'watchOS', 'tvOS', or comma-separated values of the formers except for 'all')"
+ 		platformUsage += addendum
++		
++		// value from config
++		let configuration = CCon.configuration
++		let isEnableCacheBuilds = CCon.isEnableCacheBuilds
++		func buildPlatform(from platform: Platform) -> BuildPlatform {
++			switch platform {
++			case .iOS: return .iOS
++			case .macOS: return .macOS
++			case .tvOS: return .tvOS
++			case .watchOS: return .watchOS
++			}
++		}
++		var buildPlatformValue: BuildPlatform = .all
++		let platforms = CCon.platforms
++		let platformsCount = platforms.count
++		if platformsCount != Platform.supportedPlatforms.count {
++			if platformsCount == 1, let first = platforms.first {
++				buildPlatformValue = buildPlatform(from: first)
++			} else {
++				let values = platforms.compactMap({ Optional(buildPlatform(from: $0)) })
++				buildPlatformValue = .multiple(values)
++			}
++		}
+ 
+ 		return curry(self.init)
+-			<*> mode <| Option(key: "configuration", defaultValue: "Release", usage: "the Xcode configuration to build" + addendum)
+-			<*> (mode <| Option<BuildPlatform>(key: "platform", defaultValue: .all, usage: platformUsage)).map { $0.platforms }
++			<*> mode <| Option(key: "configuration", defaultValue: configuration, usage: "the Xcode configuration to build" + addendum)
++			<*> (mode <| Option<BuildPlatform>(key: "platform", defaultValue: buildPlatformValue, usage: platformUsage)).map { $0.platforms }
+ 			<*> mode <| Option<String?>(key: "toolchain", defaultValue: nil, usage: "the toolchain to build with")
+ 			<*> mode <| Option<String?>(key: "derived-data", defaultValue: nil, usage: "path to the custom derived data folder")
+-			<*> mode <| Option(key: "cache-builds", defaultValue: false, usage: "use cached builds when possible")
++			<*> mode <| Option(key: "cache-builds", defaultValue: isEnableCacheBuilds, usage: "use cached builds when possible")
+ 			<*> mode <| Option(key: "use-binaries", defaultValue: true, usage: "use downloaded binaries when possible")
+ 	}
+ }
+@@ -111,6 +134,7 @@ public struct BuildCommand: CommandProtocol {
+ 								stderrHandle.write(data)
+ 
+ 							case let .success(project, scheme):
++								CCon.startBuildProject(project.fileURL)
+ 								carthage.println(formatting.bullets + "Building scheme " + formatting.quote(scheme.name) + " in " + formatting.projectName(project.description))
+ 							}
+ 						}
+@@ -149,6 +173,10 @@ public struct BuildCommand: CommandProtocol {
+ 			let currentProducers = buildInDirectory(directoryURL, withOptions: options.buildOptions, rootDirectoryURL: directoryURL)
+ 				.flatMapError { error -> BuildSchemeProducer in
+ 					switch error {
++					case let .skip(dependency, _, _):
++						eventSink.put(.skippedBuilding(dependency, error.description))
++						return .empty
++						
+ 					case let .noSharedFrameworkSchemes(project, _):
+ 						// Log that building the current project is being skipped.
+ 						eventSink.put(.skippedBuilding(project, error.description))
+diff --git a/Source/carthage/Checkout.swift b/Source/carthage/Checkout.swift
+index a1898a92..6472c71e 100644
+--- a/Source/carthage/Checkout.swift
++++ b/Source/carthage/Checkout.swift
+@@ -32,9 +32,11 @@ public struct CheckoutCommand: CommandProtocol {
+ 		}
+ 
+ 		public static func evaluate(_ mode: CommandMode, dependenciesUsage: String) -> Result<Options, CommandantError<CarthageError>> {
++			let isUsingSubmodules = CCon.isUsingSubmodules
++			let isUsingSSH = CCon.isUsingSSH
+ 			return curry(self.init)
+-				<*> mode <| Option(key: "use-ssh", defaultValue: false, usage: "use SSH for downloading GitHub repositories")
+-				<*> mode <| Option(key: "use-submodules", defaultValue: false, usage: "add dependencies as Git submodules")
++				<*> mode <| Option(key: "use-ssh", defaultValue: isUsingSSH, usage: "use SSH for downloading GitHub repositories")
++				<*> mode <| Option(key: "use-submodules", defaultValue: isUsingSubmodules, usage: "add dependencies as Git submodules")
+ 				<*> ColorOptions.evaluate(mode)
+ 				<*> mode <| Option(key: "project-directory", defaultValue: FileManager.default.currentDirectoryPath, usage: "the directory containing the Carthage project")
+ 				<*> (mode <| Argument(defaultValue: [], usage: dependenciesUsage, usageParameter: "dependency names")).map { $0.isEmpty ? nil : $0 }
+diff --git a/Source/carthage/Extensions.swift b/Source/carthage/Extensions.swift
+index 30e8a9fb..3cc0f9ec 100644
+--- a/Source/carthage/Extensions.swift
++++ b/Source/carthage/Extensions.swift
+@@ -72,8 +72,19 @@ extension GitURL: ArgumentProtocol {
+ internal struct ProjectEventSink {
+ 	private let colorOptions: ColorOptions
+ 
++	private static var showOnce = false
++	
+ 	init(colorOptions: ColorOptions) {
+ 		self.colorOptions = colorOptions
++		
++		golbalColorOption = colorOptions
++		if ProjectEventSink.showOnce == false {
++			ProjectEventSink.showOnce = true
++			let formatting = colorOptions.formatting
++			let prefix = formatting.bulletin("***")
++			let opts = CCon.runOptions()
++			carthage.println(prefix + " Config options: " + formatting.path(opts) )
++		}
+ 	}
+ 
+ 	mutating func put(_ event: ProjectEvent) { // swiftlint:disable:this cyclomatic_complexity
+@@ -81,7 +92,10 @@ internal struct ProjectEventSink {
+ 
+ 		switch event {
+ 		case let .cloning(dependency):
+-			carthage.println(formatting.bullets + "Cloning " + formatting.projectName(dependency.name))
++			let name = dependency.name
++			guard CCon.logRecords.contains(name) == false else { return }
++			CCon.logRecords.insert(name)
++			carthage.println(formatting.bullets + "Cloning " + formatting.projectName(name))
+ 
+ 		case let .fetching(dependency):
+ 			carthage.println(formatting.bullets + "Fetching " + formatting.projectName(dependency.name))
+diff --git a/Source/carthage/Update.swift b/Source/carthage/Update.swift
+index 747c09cd..c80e2813 100644
+--- a/Source/carthage/Update.swift
++++ b/Source/carthage/Update.swift
+@@ -59,19 +59,30 @@ public struct UpdateCommand: CommandProtocol {
+ 			self.buildOptions = buildOptions
+ 			self.checkoutOptions = checkoutOptions
+ 			self.dependenciesToUpdate = checkoutOptions.dependenciesToCheckout
++			
++			CCon.isEnableNewResolver = useNewResolver
++			CCon.isEnableVerbose = isVerbose
++			CCon.platforms = buildOptions.platforms
++			CCon.configuration = buildOptions.configuration
++			CCon.isEnableCacheBuilds = buildOptions.cacheBuilds
++			CCon.isUsingSSH = checkoutOptions.useSSH
++			CCon.isUsingSubmodules = checkoutOptions.useSubmodules
+ 		}
+ 
+ 		public static func evaluate(_ mode: CommandMode) -> Result<Options, CommandantError<CarthageError>> {
+ 			let buildDescription = "skip the building of dependencies after updating\n(ignored if --no-checkout option is present)"
+ 
+ 			let dependenciesUsage = "the dependency names to update, checkout and build"
++			
++			let isVerbose = CCon.isEnableVerbose
++			let isEnableNewResolver = CCon.isEnableNewResolver
+ 
+ 			return curry(self.init)
+ 				<*> mode <| Option(key: "checkout", defaultValue: true, usage: "skip the checking out of dependencies after updating")
+ 				<*> mode <| Option(key: "build", defaultValue: true, usage: buildDescription)
+-				<*> mode <| Option(key: "verbose", defaultValue: false, usage: "print xcodebuild output inline (ignored if --no-build option is present)")
++				<*> mode <| Option(key: "verbose", defaultValue: isVerbose, usage: "print xcodebuild output inline (ignored if --no-build option is present)")
+ 				<*> mode <| Option(key: "log-path", defaultValue: nil, usage: "path to the xcode build output. A temporary file is used by default")
+-				<*> mode <| Option(key: "new-resolver", defaultValue: false, usage: "use the new resolver codeline when calculating dependencies. Default is false")
++				<*> mode <| Option(key: "new-resolver", defaultValue: isEnableNewResolver, usage: "use the new resolver codeline when calculating dependencies. Default is false")
+ 				<*> BuildOptions.evaluate(mode, addendum: "\n(ignored if --no-build option is present)")
+ 				<*> CheckoutCommand.Options.evaluate(mode, dependenciesUsage: dependenciesUsage)
+ 		}
+diff --git a/Source/carthage/main.swift b/Source/carthage/main.swift
+index da0a2769..8e37142c 100644
+--- a/Source/carthage/main.swift
++++ b/Source/carthage/main.swift
+@@ -12,8 +12,32 @@ guard ensureGitVersion().first()?.value == true else {
+ 	exit(EXIT_FAILURE)
+ }
+ 
+-if let remoteVersion = remoteVersion(), CarthageKitVersion.current.value < remoteVersion {
+-	fputs("Please update to the latest Carthage version: \(remoteVersion). You currently are on \(CarthageKitVersion.current.value)" + "\n", stderr)
++// not blocking when network is down 
++DispatchQueue.global(qos: .background).async {
++	if let remoteVersion = remoteVersion(), CarthageKitVersion.current.value < remoteVersion {
++		fputs("Please update to the latest Carthage version: \(remoteVersion). You currently are on \(CarthageKitVersion.current.value)" + "\n", stderr)
++	}
++}
++
++CCon.readConfig()
++
++var golbalColorOption: ColorOptions? {
++	didSet {
++		guard let value = golbalColorOption else { return }
++		
++		CCon.formatHandler = { raw, style -> String in
++			switch style {
++			case .quote: return value.formatting.quote(raw)
++			case .path: return value.formatting.path(raw)
++			case .projectName: return value.formatting.projectName(raw)
++			}
++		}
++		
++		let prefix = value.formatting.bulletin("*** ")
++		CCon.logHandler = { message in
++			carthage.println("\(prefix)\(message)")
++		}
++	}
+ }
+ 
+ if let carthagePath = Bundle.main.executablePath {
+-- 
+2.17.1
+
