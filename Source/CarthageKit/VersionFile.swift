@@ -279,6 +279,11 @@ private func createVersionFile(
 			watchOS: platformCaches[Platform.watchOS.rawValue],
 			tvOS: platformCaches[Platform.tvOS.rawValue])
 
+		FrameworksCacheManager.copy(commitish: commitish,
+									name: dependencyName,
+									platformCaches: platformCaches,
+									versionFileURL: versionFileURL,
+									versionFile: versionFile)
 		return versionFile.write(to: versionFileURL)
 	}
 }
@@ -363,7 +368,14 @@ public func versionFileMatches(
 		.resolvingSymlinksInPath()
 	let versionFileURL = rootBinariesURL
 		.appendingPathComponent(".\(dependency.name).\(VersionFile.pathExtension)")
-	guard let versionFile = VersionFile(url: versionFileURL) else {
+	var versionFile_ = VersionFile(url: versionFileURL)
+
+	if versionFile_ == nil,
+		let cache = FrameworksCacheManager.versionFile(for: dependency, version: version, platforms: platforms, targetCopyURL: rootBinariesURL) {
+		versionFile_ = cache
+	}
+
+	guard let versionFile = versionFile_ else {
 		return SignalProducer(value: nil)
 	}
 
