@@ -753,6 +753,10 @@ public func build(
 	let rawDependencyURL = rootDirectoryURL.appendingPathComponent(dependency.relativePath, isDirectory: true)
 	let dependencyURL = rawDependencyURL.resolvingSymlinksInPath()
 
+	if CCon.skippableDependencies.contains(name: dependency.name) {
+		return BuildSchemeProducer(error: .skip(dependency, nil, nil) )
+	}
+
 	return buildInDirectory(dependencyURL, withOptions: options, dependency: (dependency, version), rootDirectoryURL: rootDirectoryURL, sdkFilter: sdkFilter)
 		.mapError { error in
 			switch (dependency, error) {
@@ -794,6 +798,19 @@ public func buildInDirectory( // swiftlint:disable:this function_body_length
 					} else {
 						filteredSDKs = sdks.filter { options.platforms.contains($0.platform) }
 					}
+
+					// Not build any scheme config in Configuration's skippableDependencies
+					if let dp = dependency?.dependency,
+						CCon.skippableDependencies.contains(name: dp.name, scheme: scheme.name, projectLocation: project.fileURL.lastPathComponent) {
+						let name = CCon.formatHandler("\(scheme)", .quote)
+						let toLog = "⛑  Skip Building Scheme: \(name)"
+						if CCon.logRecords.contains(toLog) == false {
+							CCon.logHandler(toLog)
+							CCon.logRecords.insert(toLog)
+						}
+						return sdkFilter([], scheme, configuration, project)
+					}
+
 					return sdkFilter(filteredSDKs, scheme, configuration, project)
 				}
 
@@ -1115,7 +1132,9 @@ public func BCSymbolMapsForFramework(_ frameworkURL: URL) -> SignalProducer<URL,
 	return UUIDsForFramework(frameworkURL)
 		.flatMap(.merge) { uuids in SignalProducer<UUID, CarthageError>(uuids) }
 		.map { uuid in
-			return directoryURL.appendingPathComponent(uuid.uuidString, isDirectory: false).appendingPathExtension("bcsymbolmap")
+			let url = directoryURL.appendingPathComponent(uuid.uuidString, isDirectory: false).appendingPathExtension("bcsymbolmap")
+			FrameworksCacheManager.add(bcSymbolMapsURL: url, for: frameworkURL)
+			return url
 		}
 }
 
