@@ -95,6 +95,9 @@ public enum CarthageError: Error {
 
 	/// Cartfile.resolved contains incompatible versions
 	case invalidResolvedCartfile([CompatibilityInfo])
+    
+    /// Skip Certain scheme
+    case skip(Dependency, Scheme?, ProjectLocator?)
 }
 
 extension CarthageError {
@@ -363,6 +366,9 @@ extension CarthageError: CustomStringConvertible {
 				}
 				.joined(separator: "\n")
 			return message
+        
+            case let .skip(dependency, scheme, project):
+                return "🚩  Skip: \(dependency), scheme: \(scheme?.description ?? "nil"), project: \(project?.description ?? "nil")"
 		}
 	}
 }

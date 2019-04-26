@@ -183,7 +183,17 @@ public func checkoutRepositoryToDirectory(
 /// repository, but without any Git metadata.
 public func cloneSubmoduleInWorkingDirectory(_ submodule: Submodule, _ workingDirectoryURL: URL) -> SignalProducer<(), CarthageError> {
 	let submoduleDirectoryURL = workingDirectoryURL.appendingPathComponent(submodule.path, isDirectory: true)
-
+    
+    var submodule = submodule
+    // override submodule url
+    if let dep = CCon.overridableDependencies[submodule.name.lowercased()], let url = dep.gitURL(preferHTTPS: true) {
+        let formatter = CCon.formatHandler
+        let ovrURL = formatter("\(url)", .path)
+        let name = formatter(submodule.name, .projectName)
+        CCon.logHandler("Override \(name) to \(ovrURL)")
+        submodule.url = url
+    }
+    
 	func repositoryCheck<T>(_ description: String, attempt closure: () throws -> T) -> Result<T, CarthageError> {
 		do {
 			return .success(try closure())
@@ -230,6 +240,17 @@ public func cloneSubmoduleInWorkingDirectory(_ submodule: Submodule, _ workingDi
 /// Recursively checks out the given submodule's revision, in its working
 /// directory.
 private func checkoutSubmodule(_ submodule: Submodule, _ submoduleWorkingDirectoryURL: URL) -> SignalProducer<(), CarthageError> {
+    
+    // override submodule clone
+    if let dep = CCon.overridableDependencies[submodule.name.lowercased()], let url = dep.gitURL(preferHTTPS: true) {
+        let fm = FileManager.default
+        let sourceURL = URL(fileURLWithPath: "\(url)")
+        let targetGitURL = submoduleWorkingDirectoryURL.appendingPathComponent(".git")
+        try? fm.copyItem(at: sourceURL, to: submoduleWorkingDirectoryURL)
+        try? fm.removeItem(at: targetGitURL)
+        return SignalProducer<(), CarthageError>.empty
+    }
+    
 	return launchGitTask([ "checkout", "--quiet", submodule.sha ], repositoryFileURL: submoduleWorkingDirectoryURL)
 		.then(launchGitTask([ "submodule", "--quiet", "update", "--init", "--recursive" ], repositoryFileURL: submoduleWorkingDirectoryURL))
 		.then(SignalProducer<(), CarthageError>.empty)

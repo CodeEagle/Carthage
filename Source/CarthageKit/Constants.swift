@@ -80,6 +80,12 @@ public struct Constants {
 		///
 		/// ~/Library/Caches/org.carthage.CarthageKit/DerivedData/
 		public static var derivedDataURL: URL = Constants.userCachesURL.appendingPathComponent("DerivedData", isDirectory: true)
+        
+        /// The file URL to the directory in which cache builded frameworks
+        /// directories will be stored.
+        ///
+        /// ~/Library/Caches/org.carthage.CarthageKit/Frameworks/
+        public static var frameworksCacheURL: URL = Constants.userCachesURL.appendingPathComponent("Frameworks", isDirectory: true)
 	}
 
 	public struct Project {
@@ -91,6 +97,9 @@ public struct Constants {
 
 		/// The relative path to a project's Cartfile.resolved.
 		public static let resolvedCartfilePath = "Cartfile.resolved"
+        
+        /// The relative path to a project's Cartfile.configuration.
+        public static let configureCartfilePath = "Cartfile.configuration"
 
 		/// The text that needs to exist in a GitHub Release asset's name, for it to be
 		/// tried as a binary framework.
